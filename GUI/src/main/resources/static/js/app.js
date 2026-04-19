@@ -45,6 +45,18 @@ const COMPETITION_NAMES = {
   'world-cup':                    'FIFA World Cup',
 };
 
+// DEMO MAPPING for Vercel/Offline mode (ID -> SLUG)
+const COMPETITION_ID_SLUGS = {
+  'GB1': 'premier-league', 'ES1': 'laliga', 'L1': 'bundesliga', 'IT1': 'serie-a', 'FR1': 'ligue-1',
+  'CL': 'champions-league', 'EL': 'europa-league', 'ECL': 'conference-league',
+  'NL1': 'eredivisie', 'PO1': 'liga-portugal', 'BE1': 'jupiler-pro-league', 'TR1': 'super-lig',
+  'BRA1': 'campeonato-brasileiro-serie-a', 'MLS': 'major-league-soccer', 'SA1': 'saudi-pro-league',
+  'SC1': 'scottish-premiership', 'GR1': 'super-league-1', 'RU1': 'premier-liga', 'PL1': 'pko-bp-ekstraklasa',
+  'SE1': 'allsvenskan', 'NO1': 'eliteserien', 'DK1': 'superliga', 'CZ1': 'chance-liga', 'HR1': 'supersport-hnl',
+  'SER1': 'super-liga-srbije', 'SU1': 'super-league', 'AUS1': 'a-league-men', 'JAP1': 'j1-league', 'KOR1': 'k-league-1',
+  'AFCN': 'africa-cup-of-nations', 'AFAC': 'afc-asian-cup', 'COPA': 'copa-america', 'EURO': 'uefa-euro', 'WC': 'world-cup'
+};
+
 const COMPETITION_FLAGS = {
   AUS1:'🇦🇺', AFAC:'🌏', AFCN:'🌍', SE1:'🇸🇪', A1:'🇦🇹', L1:'🇩🇪',
   BRA1:'🇧🇷', TS1:'🇨🇿', COPA:'🌎', NO1:'🇳🇴', NL1:'🇳🇱', JAP1:'🇯🇵',
@@ -270,6 +282,24 @@ function enterDashboard() {
   setTimeout(() => el.style.display = 'none', 500);
 }
 
+// ── Performance Utilities ──────────────────────────────────────
+/**
+ * A fast fetch that times out after ms (default 1500)
+ * Essential for Vercel speed when the backend is offline.
+ */
+async function fastFetch(url, ms = 1500) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), ms);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+}
+
 function rotateQuotes() {
   const el = document.getElementById('welcome-quote');
   if (!el) return;
@@ -284,11 +314,12 @@ function rotateQuotes() {
 
 // ── Status ─────────────────────────────────────────────────────
 async function checkStatus() {
+  const pill = document.getElementById('sync-status');
+  const text = document.getElementById('sync-text');
+
   try {
-    const r = await fetch('/api/status');
+    const r = await fastFetch('/api/status');
     const d = await r.json();
-    const pill = document.getElementById('sync-status');
-    const text = document.getElementById('sync-text');
     if (d.eventsReady) {
       pill.classList.add('ready');
       text.textContent = 'Live';
@@ -296,25 +327,33 @@ async function checkStatus() {
       pill.classList.remove('ready');
       text.textContent = 'Syncing...';
     }
-  } catch (_) {}
+  } catch (_) {
+    pill.classList.add('ready');
+    pill.style.background = 'var(--text-muted)';
+    text.textContent = 'DEMO MODE';
+  }
 }
 
 // ── Competitions ───────────────────────────────────────────────
 async function loadCompetitions() {
   try {
-    const r = await fetch('/api/competitions');
+    const r = await fastFetch('/api/competitions');
+    if (!r.ok) throw new Error();
     allCompetitions = await r.json();
-    renderCompetitions(allCompetitions);
-    // Auto-select first major domestic league
-    const major = allCompetitions.find(c =>
-      ['GB1','ES1','L1','IT1','FR1'].includes(c.competitionId)
-    );
-    if (major) selectCompetition(major);
-    else selectCompetition(null);
+    if (!allCompetitions.length) throw new Error();
   } catch (e) {
-    document.getElementById('competition-list').innerHTML =
-      '<div style="padding:16px;font-size:12px;color:var(--text-muted)">Failed to load competitions</div>';
+    // Instant Demo Fallback
+    allCompetitions = Object.keys(COMPETITION_ID_SLUGS).map(id => ({
+      competitionId: id,
+      competitionSlug: COMPETITION_ID_SLUGS[id],
+      competitionName: COMPETITION_NAMES[COMPETITION_ID_SLUGS[id]] || id
+    }));
   }
+
+  renderCompetitions(allCompetitions);
+  const major = allCompetitions.find(c => ['GB1','ES1','L1','IT1','FR1'].includes(c.competitionId));
+  if (major) selectCompetition(major);
+  else selectCompetition(null);
 }
 
 function renderCompetitions(list) {
@@ -408,11 +447,22 @@ async function loadMatches() {
     if (currentCompId) url += `competitionId=${encodeURIComponent(currentCompId)}&`;
     if (currentSeason)  url += `season=${encodeURIComponent(currentSeason)}&`;
 
-    const r = await fetch(url);
+    const r = await fastFetch(url);
+    if (!r.ok) throw new Error();
     allMatches = await r.json();
     renderMatchList(allMatches);
   } catch (_) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Failed to load matches.</p></div>';
+    // Demo Mode: Use bundled local data
+    if (typeof DEMO_DATASET !== 'undefined') {
+      allMatches = DEMO_DATASET.filter(m => {
+        const matchComp = !currentCompId || m.competitionId === currentCompId;
+        const matchSeason = !currentSeason || String(m.season) === String(currentSeason);
+        return matchComp && matchSeason;
+      });
+      renderMatchList(allMatches);
+    } else {
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Failed to load matches.</p></div>';
+    }
   }
 }
 
