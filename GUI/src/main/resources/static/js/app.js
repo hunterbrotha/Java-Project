@@ -373,7 +373,8 @@ async function loadCompetitions() {
     allCompetitions = Object.keys(COMPETITION_ID_SLUGS).map(id => ({
       competitionId: id,
       competitionSlug: COMPETITION_ID_SLUGS[id],
-      competitionName: COMPETITION_NAMES[COMPETITION_ID_SLUGS[id]] || id
+      name: COMPETITION_ID_SLUGS[id],
+      countryName: 'International'
     }));
   }
 
@@ -395,7 +396,8 @@ function renderCompetitions(list) {
     </div>`;
   list.forEach(c => {
     const flag = COMPETITION_FLAGS[c.competitionId] || '🏆';
-    const displayName = COMPETITION_NAMES[c.name] || c.name
+    const rawName = c.name || '';
+    const displayName = COMPETITION_NAMES[rawName] || rawName
       .split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     html += `
       <div class="comp-item anim-in ${currentCompId === c.competitionId ? 'active' : ''}"
@@ -415,7 +417,7 @@ function renderCompetitions(list) {
 function filterCompetitions() {
   const q = document.getElementById('comp-search').value.toLowerCase();
   const filtered = allCompetitions.filter(c =>
-    c.name.toLowerCase().includes(q) ||
+    (c.name || '').toLowerCase().includes(q) ||
     (c.countryName || '').toLowerCase().includes(q)
   );
   renderCompetitions(filtered);
