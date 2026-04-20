@@ -895,9 +895,6 @@ async function loadStandings() {
       </div>`;
     // Stagger-animate table rows
     observeElements('.standings-table tbody tr', el);
-  } catch (_) {
-    el.innerHTML = '<div class="empty-state"><p>Failed to load standings</p></div>';
-  }
 }
 
 // ── Market ─────────────────────────────────────────────────────
