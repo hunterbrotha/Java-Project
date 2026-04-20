@@ -815,26 +815,62 @@ async function loadStandings() {
     return;
   }
   el.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Building table...</p></div>';
-  try {
-    const r = await fetch(`/api/standings?competitionId=${encodeURIComponent(currentCompId)}&season=${encodeURIComponent(currentSeason)}`);
-    let rows = await r.json();
+    let rows = [];
+    try {
+      const r = await fastFetch(`/api/standings?competitionId=${encodeURIComponent(currentCompId)}&season=${encodeURIComponent(currentSeason)}`);
+      if (r.ok) rows = await r.json();
+    } catch (_) {}
 
     // If API has no data, try supplemental web-sourced data
     let isSupplemental = false;
-    if (!rows.length) {
+    if (!rows || !rows.length) {
       const key = `${currentCompId}_${currentSeason}`;
       rows = SUPPLEMENTAL_STANDINGS[key] || [];
       isSupplemental = rows.length > 0;
     }
 
+    // Dynamic Standings Aggregation for Offline Vercel Datasets
+    let isAggregated = false;
+    if (!rows || !rows.length) {
+      if (typeof DEMO_DATASET !== 'undefined') {
+        const compMatches = DEMO_DATASET.filter(m => m.competitionId === currentCompId);
+        if (compMatches.length) {
+          const stats = {};
+          compMatches.forEach(m => {
+            const h = m.homeClubName; const a = m.awayClubName;
+            if (!h || !a) return;
+            if (!stats[h]) stats[h] = { clubName: h, played:0, won:0, drawn:0, lost:0, goalsFor:0, goalsAgainst:0, goalDifference:0, points:0 };
+            if (!stats[a]) stats[a] = { clubName: a, played:0, won:0, drawn:0, lost:0, goalsFor:0, goalsAgainst:0, goalDifference:0, points:0 };
+            
+            const hg = parseInt(m.homeClubGoals)||0; const ag = parseInt(m.awayClubGoals)||0;
+            stats[h].played++; stats[a].played++;
+            stats[h].goalsFor += hg; stats[h].goalsAgainst += ag;
+            stats[a].goalsFor += ag; stats[a].goalsAgainst += hg;
+            
+            if (hg > ag) { stats[h].won++; stats[a].lost++; stats[h].points += 3; }
+            else if (ag > hg) { stats[a].won++; stats[h].lost++; stats[a].points += 3; }
+            else { stats[h].drawn++; stats[a].drawn++; stats[h].points += 1; stats[a].points += 1; }
+          });
+          
+          rows = Object.values(stats).map(s => {
+            s.goalDifference = s.goalsFor - s.goalsAgainst;
+            return s;
+          }).sort((a,b) => b.points - a.points || b.goalDifference - a.goalDifference || b.goalsFor - a.goalsFor);
+          isAggregated = true;
+        }
+      }
+    }
+
     if (!rows.length) {
-      el.innerHTML = '<div class="empty-state"><p>No standings data available for this competition</p><p style="font-size:11px;color:var(--text-muted);margin-top:8px">Try the Premier League, LaLiga, Bundesliga, Serie A or Ligue 1 for 2025</p></div>';
+      el.innerHTML = '<div class="empty-state"><p>No standings data available for this competition</p><p style="font-size:11px;color:var(--text-muted);margin-top:8px">Matches may be cup ties or lack season bindings.</p></div>';
       return;
     }
 
     const title = document.getElementById('comp-title').textContent;
-    const sourceTag = isSupplemental
-      ? `<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:3px;background:rgba(76,175,125,0.12);color:var(--win);margin-left:8px;">WEB SOURCED</span>`
+    const badgeHtml = isSupplemental 
+      ? `<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:3px;background:rgba(76,175,125,0.12);color:var(--win);margin-left:8px;">STATIC SOURCED</span>`
+      : isAggregated 
+      ? `<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:3px;background:var(--accent-dim);color:var(--accent);margin-left:8px;">LIVE OFFLINE</span>`
       : '';
 
     el.innerHTML = `
