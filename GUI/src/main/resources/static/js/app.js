@@ -875,7 +875,7 @@ async function loadStandings() {
 
     el.innerHTML = `
       <div class="standings-card">
-        <div class="standings-title">${esc(title)} — ${esc(currentSeason)} ${sourceTag}</div>
+        <div class="standings-title">${esc(title)} — ${esc(currentSeason)} ${badgeHtml}</div>
         <table class="standings-table">
           <thead><tr>
             <th>#</th><th>Club</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>GD</th><th>Pts</th>
