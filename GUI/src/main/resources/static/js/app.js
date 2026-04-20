@@ -510,11 +510,14 @@ function handleSearch() {
 function renderMatchList(matches) {
   const container = document.getElementById('match-list');
 
-  // Always inject showcase matches at the top (pinned section)
-  const showcaseHtml = `
-    <div class="date-label unbox" style="color:var(--accent);border-color:var(--accent)">⭐ Featured Showcase Matches</div>
-    ${SUPPLEMENTAL_MATCHES.map(m => renderMatchCard(m)).join('')}
-    <div class="date-label unbox" style="margin-top:16px">Dataset Matches</div>`;
+  // Only inject showcase matches if viewing 'All Competitions' (no specific competition selected)
+  let showcaseHtml = '';
+  if (currentCompId === '' || currentCompId === 'CL') {
+    showcaseHtml = `
+      <div class="date-label unbox" style="color:var(--accent);border-color:var(--accent)">⭐ Featured Showcase Matches</div>
+      ${SUPPLEMENTAL_MATCHES.map(m => renderMatchCard(m)).join('')}
+      <div class="date-label unbox" style="margin-top:16px">Dataset Matches</div>`;
+  }
 
   if (!matches.length) {
     container.innerHTML = showcaseHtml + '<div class="empty-state"><div class="empty-icon">⚽</div><p>No dataset matches for this filter</p><p style="font-size:11px;margin-top:4px">Try a different competition or season</p></div>';
