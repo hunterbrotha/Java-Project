@@ -479,6 +479,7 @@ async function loadMatches() {
     const r = await fastFetch(url);
     if (!r.ok) throw new Error();
     allMatches = await r.json();
+    if (!allMatches || allMatches.length === 0) throw new Error("Empty backend array fallback");
     renderMatchList(allMatches);
   } catch (_) {
     // Demo Mode: Use bundled local data
